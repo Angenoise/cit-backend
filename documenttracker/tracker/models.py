@@ -68,9 +68,11 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    # Encryption key (stored separately for production use)
+    # IDEA key material for each document
+    master_key = models.BinaryField(editable=False)
+    secret_key = models.BinaryField(editable=False)
     encryption_key = models.BinaryField(editable=False)
-    
+
     class Meta:
         db_table = 'documents'
         ordering = ['-created_at']
@@ -81,14 +83,16 @@ class Document(models.Model):
         ]
     
     def save(self, *args, **kwargs):
-        """Override save to generate encryption key and encrypted ID on creation."""
+        """Override save to generate IDEA keys and encrypted ID on creation."""
         if not self.pk:
-            # Generate encryption key on first save
-            self.encryption_key = generate_idea_key()
-            
-            # Generate and encrypt document ID
-            self.encrypted_id = encrypt_data(str(self.document_id), self.encryption_key)
-            
+            # Generate per-document IDEA keys on first save
+            self.master_key = generate_idea_key()
+            self.secret_key = generate_idea_key()
+            self.encryption_key = self.secret_key
+
+            # Generate and encrypt document ID using the secret key
+            self.encrypted_id = encrypt_data(str(self.document_id), self.secret_key)
+
             # Generate unique access key
             self.access_key = self.generate_access_key()
         
