@@ -3,9 +3,6 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import CustomUser, Document, AuditLog
 from .encryption import encrypt_data, decrypt_data
-import qrcode
-from io import BytesIO
-import base64
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -76,13 +73,13 @@ class DocumentListSerializer(serializers.ModelSerializer):
     
     owner_name = serializers.CharField(source='owner.username', read_only=True)
     is_owner = serializers.SerializerMethodField()
-    qr_code = serializers.SerializerMethodField()
+    encrypted_id = serializers.CharField(read_only=True)
     
     class Meta:
         model = Document
         fields = [
             'id', 'document_id', 'title', 'description', 'document_type',
-            'due_date', 'owner_name', 'is_owner', 'created_at', 'qr_code'
+            'due_date', 'owner_name', 'is_owner', 'created_at', 'encrypted_id'
         ]
         read_only_fields = ['document_id', 'created_at']
     
@@ -92,29 +89,6 @@ class DocumentListSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.owner == request.user
         return False
-    
-    def get_qr_code(self, obj):
-        """Generate QR code as base64 image."""
-        try:
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=2,
-            )
-            # QR data contains encrypted document ID
-            qr.add_data(f"doc:{obj.encrypted_id}")
-            qr.make(fit=True)
-            
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            # Convert to base64
-            img_io = BytesIO()
-            img.save(img_io, 'PNG')
-            img_io.seek(0)
-            return base64.b64encode(img_io.getvalue()).decode()
-        except Exception as e:
-            return None
 
 
 class DocumentDetailSerializer(serializers.ModelSerializer):
@@ -123,7 +97,7 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     owner = UserSerializer(read_only=True)
     is_owner = serializers.SerializerMethodField()
     can_access = serializers.SerializerMethodField()
-    qr_code = serializers.SerializerMethodField()
+    encrypted_id = serializers.CharField(read_only=True)
     access_key_display = serializers.SerializerMethodField()
     
     class Meta:
@@ -131,7 +105,7 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'document_id', 'title', 'description', 'document_type',
             'due_date', 'remarks', 'owner', 'is_owner', 'can_access',
-            'created_at', 'updated_at', 'file', 'qr_code', 'access_key_display'
+            'created_at', 'updated_at', 'file', 'encrypted_id', 'access_key_display'
         ]
         read_only_fields = ['document_id', 'created_at', 'updated_at', 'file']
     
@@ -148,27 +122,6 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.can_access(request.user)
         return False
-    
-    def get_qr_code(self, obj):
-        """Generate QR code as base64 image."""
-        try:
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=2,
-            )
-            qr.add_data(f"doc:{obj.encrypted_id}")
-            qr.make(fit=True)
-            
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            img_io = BytesIO()
-            img.save(img_io, 'PNG')
-            img_io.seek(0)
-            return base64.b64encode(img_io.getvalue()).decode()
-        except Exception as e:
-            return None
     
     def get_access_key_display(self, obj):
         """Return access key only if user is owner."""

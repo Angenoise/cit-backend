@@ -165,48 +165,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
             'document_id': str(document.document_id),
         })
     
-    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
-    def get_qr_code(self, request, pk=None):
-        """Get QR code for a document."""
-        document = self.get_object()
-        
-        if document.owner != request.user:
-            return Response(
-                {'detail': 'Only the owner can view the QR code.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        try:
-            import qrcode
-            from io import BytesIO
-            import base64
-            
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=2,
-            )
-            qr.add_data(f"doc:{document.encrypted_id}")
-            qr.make(fit=True)
-            
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            img_io = BytesIO()
-            img.save(img_io, 'PNG')
-            img_io.seek(0)
-            qr_base64 = base64.b64encode(img_io.getvalue()).decode()
-            
-            return Response({
-                'qr_code': qr_base64,
-                'encrypted_id': document.encrypted_id,
-            })
-        except Exception as e:
-            return Response(
-                {'detail': f'Error generating QR code: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
     def _log_access(self, document, access_type, request):
         """Log document access."""
         try:
