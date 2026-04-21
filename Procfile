@@ -1,1 +1,1 @@
-web: gunicorn documenttracker.wsgi:application --log-file -
+web: cd documenttracker && gunicorn documenttracker.wsgi:application --log-file -
